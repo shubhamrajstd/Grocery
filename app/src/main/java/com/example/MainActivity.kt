@@ -5,12 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
@@ -21,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
@@ -30,6 +36,7 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LibraryScreen
 import com.example.ui.screens.PlayerSheet
 import com.example.ui.screens.SearchScreen
+import com.example.ui.screens.GenreSelectionDialog
 import com.example.ui.theme.AmoledBlack
 import com.example.ui.theme.CardGrey
 import com.example.ui.theme.MyApplicationTheme
@@ -59,8 +66,106 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 var currentScreen by remember { mutableStateOf(0) } // 0: Home, 1: Search, 2: Library
                 val currentSong by viewModel.currentSong.collectAsState()
+                var showGenreDialog by remember { mutableStateOf(false) }
+                val favoriteGenres by viewModel.favoriteGenres.collectAsState()
+                val searchQuery by viewModel.searchQuery.collectAsState()
 
                 Scaffold(
+                    topBar = {
+                        Column(
+                            modifier = Modifier
+                                .background(AmoledBlack)
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // YT Music Premium Logo
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { currentScreen = 0 }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        tint = YTRed,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "YT Music",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp,
+                                        color = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Premium",
+                                        fontSize = 10.sp,
+                                        color = YTRed,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+
+                                // Preferences Button
+                                IconButton(
+                                    onClick = { showGenreDialog = true },
+                                    modifier = Modifier.testTag("global_settings_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Preferences",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Global Search bar at the top of application to query songs, albums, and artists
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = {
+                                    viewModel.setQuery(it)
+                                    if (currentScreen != 1) {
+                                        currentScreen = 1 // Auto-navigate to Search tab
+                                    }
+                                },
+                                placeholder = { Text("Search songs, albums, or artists...", color = TextSilver, fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp)) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { viewModel.setQuery("") }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.White, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = CardGrey,
+                                    unfocusedContainerColor = CardGrey,
+                                    disabledContainerColor = CardGrey,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = YTRed,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .testTag("global_search_input")
+                            )
+                        }
+                    },
                     bottomBar = {
                         NavigationBar(
                             containerColor = AmoledBlack,
@@ -137,7 +242,10 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = innerPadding.calculateBottomPadding())
+                            .padding(
+                                top = innerPadding.calculateTopPadding(),
+                                bottom = innerPadding.calculateBottomPadding()
+                            )
                     ) {
                         // Main Screen switching content area
                         when (currentScreen) {
@@ -174,6 +282,17 @@ class MainActivity : ComponentActivity() {
                                 PlayerSheet(viewModel = viewModel)
                             }
                         }
+                    }
+
+                    if (showGenreDialog) {
+                        GenreSelectionDialog(
+                            currentGenres = favoriteGenres,
+                            onDismiss = { showGenreDialog = false },
+                            onSave = { genres ->
+                                viewModel.updateFavoriteGenres(genres)
+                                showGenreDialog = false
+                            }
+                        )
                     }
                 }
             }

@@ -7,8 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MusicNote
@@ -23,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Song
@@ -42,89 +39,50 @@ fun SearchScreen(
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
     val focusManager = LocalFocusManager.current
     
     val moodChips = listOf("Relax", "Focus lofi", "Workout pop", "Synthwave drive", "Jazz rain")
 
-    Scaffold(
-        topBar = {
-            Column(
-                modifier = Modifier
-                    .background(AmoledBlack)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                // Search Input
-                TextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.setQuery(it) },
-                    placeholder = { Text("Search songs, albums, or artists...", color = TextSilver, fontSize = 14.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.White) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setQuery("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.White)
-                            }
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = CardGrey,
-                        unfocusedContainerColor = CardGrey,
-                        disabledContainerColor = CardGrey,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = YTRed,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .testTag("search_input")
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Suggestion Mood Chips
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(moodChips) { chip ->
-                        val isSelected = searchQuery.equals(chip, ignoreCase = true)
-                        SuggestionChip(
-                            onClick = {
-                                if (isSelected) {
-                                    viewModel.setQuery("")
-                                } else {
-                                    viewModel.setQuery(chip)
-                                    focusManager.clearFocus()
-                                }
-                            },
-                            label = { Text(chip, fontSize = 12.sp) },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = if (isSelected) YTRed else Color.White.copy(alpha = 0.1f),
-                                labelColor = if (isSelected) Color.White else TextSilver
-                            ),
-                            border = null,
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                    }
-                }
-            }
-        },
-        containerColor = AmoledBlack,
+    Box(
         modifier = modifier
-    ) { innerPadding ->
+            .fillMaxSize()
+            .background(AmoledBlack)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Suggestion Mood Chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(moodChips) { chip ->
+                    val isSelected = searchQuery.equals(chip, ignoreCase = true)
+                    SuggestionChip(
+                        onClick = {
+                            if (isSelected) {
+                                viewModel.setQuery("")
+                            } else {
+                                viewModel.setQuery(chip)
+                                focusManager.clearFocus()
+                            }
+                        },
+                        label = { Text(chip, fontSize = 12.sp) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = if (isSelected) YTRed else Color.White.copy(alpha = 0.1f),
+                            labelColor = if (isSelected) Color.White else TextSilver
+                        ),
+                        border = null,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                }
+            }
+
             // Ad-free Banner
             Box(
                 modifier = Modifier
@@ -178,7 +136,9 @@ fun SearchScreen(
                         SongRowItem(
                             song = song,
                             onPlayClick = { onSongSelected(song, searchResults) },
-                            onLikeClick = { viewModel.toggleLikeSong(song) }
+                            onLikeClick = { viewModel.toggleLikeSong(song) },
+                            onDownloadClick = { viewModel.downloadSong(song) },
+                            downloadProgress = downloadProgress[song.id]
                         )
                     }
                     

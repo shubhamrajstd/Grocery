@@ -53,9 +53,9 @@ fun HomeScreen(
     val recentSongs by viewModel.recentSongs.collectAsState()
     val defaultLibrary = viewModel.defaultLibrary
     val quickPicks by viewModel.quickPicks.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
     
     var showGenreDialog by remember { mutableStateOf(false) }
-    var showApkInfoDialog by remember { mutableStateOf(false) }
 
     // Auto-generate mixes on launch if empty
     LaunchedEffect(Unit) {
@@ -64,62 +64,14 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = null,
-                            tint = YTRed,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "YT Music",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Premium",
-                            fontSize = 11.sp,
-                            color = YTRed,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { showApkInfoDialog = true },
-                        modifier = Modifier.testTag("apk_info_button")
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = "Download APK", tint = YTRed)
-                    }
-                    IconButton(
-                        onClick = { showGenreDialog = true },
-                        modifier = Modifier.testTag("settings_button")
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Preferences", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = AmoledBlack
-                )
-            )
-        },
-        containerColor = AmoledBlack,
+    Box(
         modifier = modifier
-    ) { innerPadding ->
+            .fillMaxSize()
+            .background(AmoledBlack)
+    ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
@@ -204,7 +156,9 @@ fun HomeScreen(
                             SongRowItem(
                                 song = song,
                                 onPlayClick = { onSongSelected(song, recentSongs) },
-                                onLikeClick = { viewModel.toggleLikeSong(song) }
+                                onLikeClick = { viewModel.toggleLikeSong(song) },
+                                onDownloadClick = { viewModel.downloadSong(song) },
+                                downloadProgress = downloadProgress[song.id]
                             )
                         }
                     }
@@ -227,7 +181,9 @@ fun HomeScreen(
                         SongRowItem(
                             song = song,
                             onPlayClick = { onSongSelected(song, displayLibrary) },
-                            onLikeClick = { viewModel.toggleLikeSong(song) }
+                            onLikeClick = { viewModel.toggleLikeSong(song) },
+                            onDownloadClick = { viewModel.downloadSong(song) },
+                            downloadProgress = downloadProgress[song.id]
                         )
                     }
                 }
@@ -251,48 +207,6 @@ fun HomeScreen(
         )
     }
 
-    // APK Download Information Dialog
-    if (showApkInfoDialog) {
-        AlertDialog(
-            onDismissRequest = { showApkInfoDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = YTRed, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Download APK", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "To download the fully compiled APK for this music application:",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "1. Look at the Google AI Studio menu in your browser interface (located in the top-right header or settings/export panel).\n" +
-                               "2. Open the project options/export menu.\n" +
-                               "3. Select 'Export Project' or 'Download APK' to compile a direct installable package.\n" +
-                               "4. Transfer or download the APK file onto your Android device to enjoy ad-free premium streaming offline anywhere!",
-                        color = TextSilver,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showApkInfoDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = YTRed)
-                ) {
-                    Text("Got It", color = Color.White)
-                }
-            },
-            containerColor = CardGrey
-        )
-    }
 }
 
 @Composable
@@ -418,7 +332,9 @@ fun SongRowItem(
     song: Song,
     onPlayClick: () -> Unit,
     onLikeClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onDownloadClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    downloadProgress: Int? = null
 ) {
     Row(
         modifier = modifier
@@ -469,15 +385,42 @@ fun SongRowItem(
             }
         }
         
+        // Circular Progress or Download Button
+        Box(
+            modifier = Modifier.padding(end = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (downloadProgress != null) {
+                CircularProgressIndicator(
+                    progress = { downloadProgress / 100f },
+                    color = YTRed,
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                IconButton(
+                    onClick = onDownloadClick,
+                    modifier = Modifier.size(36.dp).testTag("download_button_${song.id}")
+                ) {
+                    Icon(
+                        imageVector = if (song.isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                        contentDescription = if (song.isDownloaded) "Downloaded" else "Download",
+                        tint = if (song.isDownloaded) YTRed else TextSilver,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
         IconButton(
             onClick = onLikeClick,
-            modifier = Modifier.testTag("like_button_${song.id}")
+            modifier = Modifier.size(36.dp).testTag("like_button_${song.id}")
         ) {
             Icon(
                 imageVector = if (song.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = "Like",
                 tint = if (song.isLiked) YTRed else TextSilver,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
     }

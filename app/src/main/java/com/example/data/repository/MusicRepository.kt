@@ -130,9 +130,52 @@ class MusicRepository(
                 
                 val html = response.body?.string() ?: return@withContext emptyList()
                 
-                val regex = Regex("""ytInitialData\s*=\s*(\{.+?\});""", RegexOption.DOT_MATCHES_ALL)
-                val match = regex.find(html)
-                val jsonStr = match?.groupValues?.get(1)
+                var jsonStr: String? = null
+                
+                // Robust brace-counting extraction for ytInitialData JSON object
+                val ytInitialDataKeyword = "ytInitialData"
+                val keywordIndex = html.indexOf(ytInitialDataKeyword)
+                if (keywordIndex != -1) {
+                    val braceStartIndex = html.indexOf("{", keywordIndex)
+                    if (braceStartIndex != -1) {
+                        var openBraces = 0
+                        var inString = false
+                        var escape = false
+                        for (i in braceStartIndex until html.length) {
+                            val c = html[i]
+                            if (escape) {
+                                escape = false
+                                continue
+                            }
+                            if (c == '\\') {
+                                escape = true
+                                continue
+                            }
+                            if (c == '"') {
+                                inString = !inString
+                                continue
+                            }
+                            if (!inString) {
+                                if (c == '{') {
+                                    openBraces++
+                                } else if (c == '}') {
+                                    openBraces--
+                                    if (openBraces == 0) {
+                                        jsonStr = html.substring(braceStartIndex, i + 1)
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Fallback to original regex if brace counting didn't find anything
+                if (jsonStr == null) {
+                    val regex = Regex("""ytInitialData\s*=\s*(\{.+?\});""", RegexOption.DOT_MATCHES_ALL)
+                    val match = regex.find(html)
+                    jsonStr = match?.groupValues?.get(1)
+                }
                 
                 if (jsonStr != null) {
                     val json = JSONObject(jsonStr)
@@ -219,7 +262,7 @@ class MusicRepository(
         }
     }
 
-    // Resolves any video ID or song title to a direct, playable audio stream URL
+    // Resolves any video ID or song title to a direct, playable audio stream URL with robust Cobalt & Piped redundancy
     suspend fun resolveStreamUrl(song: Song): String = withContext(Dispatchers.IO) {
         var videoId = song.id
         
@@ -233,13 +276,64 @@ class MusicRepository(
             }
         }
         
-        // Piped API instances for fast streaming
+        // 1. Try public Cobalt API instances first (high speed, direct audio streams)
+        val cobaltInstances = listOf(
+            "https://api.cobalt.tools/api/json",
+            "https://co.wuk.sh/api/json",
+            "https://cobalt.hyper.lol/api/json",
+            "https://cobalt.api.ryb.gg/api/json"
+        )
+        
+        for (instance in cobaltInstances) {
+            try {
+                val cobaltJson = JSONObject().apply {
+                    put("url", "https://www.youtube.com/watch?v=$videoId")
+                    put("isAudioOnly", true)
+                    put("downloadMode", "audio")
+                    put("audioFormat", "mp3")
+                }
+                val body = cobaltJson.toString().toRequestBody("application/json".toMediaType())
+                val request = Request.Builder()
+                    .url(instance)
+                    .post(body)
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .build()
+                
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val resBody = response.body?.string()
+                        if (resBody != null) {
+                            val json = JSONObject(resBody)
+                            val streamUrl = json.optString("url")
+                            if (streamUrl.isNotEmpty()) {
+                                Log.d("MusicRepository", "Resolved video $videoId to audio stream URL using Cobalt $instance")
+                                return@withContext streamUrl
+                            }
+                        }
+                    } else {
+                        Log.w("MusicRepository", "Cobalt $instance returned HTTP code: ${response.code}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MusicRepository", "Cobalt instance $instance failed for $videoId", e)
+            }
+        }
+        
+        // 2. Try extended active Piped API instances as secondary fallback
         val pipedInstances = listOf(
             "https://pipedapi.kavin.rocks",
+            "https://pipedapi.tokhmi.xyz",
             "https://pipedapi.colby.land",
-            "https://pipedapi.us.to",
-            "https://pipedapi.drg.sh",
-            "https://pipedapi.astre.me"
+            "https://pipedapi.suyu.sh",
+            "https://pipedapi.leptons.xyz",
+            "https://pipedapi.adminforge.de",
+            "https://pipedapi.extravi.dev",
+            "https://pipedapi.moegirl.org",
+            "https://pipedapi.privacydev.net",
+            "https://pipedapi.swish.re",
+            "https://pipedapi.us.to"
         )
         
         for (instance in pipedInstances) {
@@ -275,7 +369,7 @@ class MusicRepository(
                                     bestStreamUrl = audioStreams.getJSONObject(0).optString("url")
                                 }
                                 if (bestStreamUrl.isNotEmpty()) {
-                                    Log.d("MusicRepository", "Resolved video $videoId to audio stream URL using $instance")
+                                    Log.d("MusicRepository", "Resolved video $videoId to audio stream URL using Piped $instance")
                                     return@withContext bestStreamUrl
                                 }
                             }
@@ -287,12 +381,13 @@ class MusicRepository(
             }
         }
         
-        // Invidious API instances as backup
+        // 3. Try Invidious API instances as tertiary fallback
         val invidiousInstances = listOf(
             "https://yewtu.be",
             "https://vid.puffyan.us",
             "https://inv.tux.im",
-            "https://invidious.snopyta.org"
+            "https://invidious.snopyta.org",
+            "https://invidious.io"
         )
         for (instance in invidiousInstances) {
             try {

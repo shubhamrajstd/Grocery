@@ -51,22 +51,18 @@ fun LibraryScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0: Downloads, 1: Liked
     val tabs = listOf("Offline Downloads", "Liked Songs")
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Your Premium Library", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = AmoledBlack)
-            )
-        },
-        containerColor = AmoledBlack,
+    Box(
         modifier = modifier
-    ) { innerPadding ->
+            .fillMaxSize()
+            .background(AmoledBlack)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
             // Stats & AI Insight Card
             ListeningInsightsCard(
                 downloadCount = downloadedSongs.size,
@@ -124,7 +120,9 @@ fun LibraryScreen(
                             onSongSelected(shuffled.first(), shuffled)
                         }
                     },
-                    onToggleLike = { song -> viewModel.toggleLikeSong(song) }
+                    onToggleLike = { song -> viewModel.toggleLikeSong(song) },
+                    onDownload = { song -> viewModel.downloadSong(song) },
+                    downloadProgress = downloadProgress
                 )
             }
         }
@@ -364,7 +362,9 @@ fun LikedSongsTab(
     songs: List<Song>,
     onPlay: (Song) -> Unit,
     onShuffle: () -> Unit,
-    onToggleLike: (Song) -> Unit
+    onToggleLike: (Song) -> Unit,
+    onDownload: (Song) -> Unit,
+    downloadProgress: Map<String, Int>
 ) {
     if (songs.isEmpty()) {
         Box(
@@ -419,7 +419,9 @@ fun LikedSongsTab(
                     SongRowItem(
                         song = song,
                         onPlayClick = { onPlay(song) },
-                        onLikeClick = { onToggleLike(song) }
+                        onLikeClick = { onToggleLike(song) },
+                        onDownloadClick = { onDownload(song) },
+                        downloadProgress = downloadProgress[song.id]
                     )
                 }
                 
