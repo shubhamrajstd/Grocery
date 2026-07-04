@@ -1,0 +1,6 @@
+{
+  "name": "YT Music",
+  "description": "Premium music streaming experience powered by YouTube, featuring offline downloads, background playback, ad-free listening, and smart daily mixes curated by Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
