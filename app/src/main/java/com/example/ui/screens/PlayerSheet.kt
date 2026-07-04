@@ -429,7 +429,7 @@ fun ExpandedPlayerContent(
             Box(contentAlignment = Alignment.Center) {
                 if (downloadProgress != null) {
                     CircularProgressIndicator(
-                        progress = downloadProgress / 100f,
+                        progress = { downloadProgress / 100f },
                         color = YTRed,
                         modifier = Modifier.size(36.dp),
                         strokeWidth = 3.dp

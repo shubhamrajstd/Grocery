@@ -173,7 +173,7 @@ fun ListeningInsightsCard(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            Divider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             
             Spacer(modifier = Modifier.height(12.dp))
             
@@ -328,7 +328,7 @@ fun ActiveDownloadRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         CircularProgressIndicator(
-            progress = progress / 100f,
+            progress = { progress / 100f },
             color = YTRed,
             trackColor = Color.White.copy(alpha = 0.1f),
             modifier = Modifier.size(24.dp),
@@ -341,7 +341,7 @@ fun ActiveDownloadRow(
             Text("Downloading Track...", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             Spacer(modifier = Modifier.height(2.dp))
             LinearProgressIndicator(
-                progress = progress / 100f,
+                progress = { progress / 100f },
                 color = YTRed,
                 trackColor = Color.White.copy(alpha = 0.1f),
                 modifier = Modifier
